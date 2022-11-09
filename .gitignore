@@ -1,0 +1,12 @@
+**/dataset
+**/.idea
+**/__pycache__
+**/.vscode
+*.pyc
+test.py
+*.txt
+*.arff
+*.csv
+*.log
+*record*
+
