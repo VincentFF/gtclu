@@ -1,4 +1,4 @@
-from gtclu.gtclu.gtclu_fast import GTCLU
+from gtclu.gtclu.gtclu import GTCLU
 import timeit
 import numpy as np
 
@@ -7,7 +7,7 @@ record = "/home/doors/Code/GTCLU/gtclu/test/time-record"
 dataset = "50k-20d-10c"
 d = 20
 e = 0.5
-m = 10
+m = 5
 
 
 sf = "/home/doors/Code/dataset/big/" + dataset

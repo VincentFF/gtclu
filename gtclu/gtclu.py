@@ -1,7 +1,9 @@
 from collections import deque
 import math
 import copy
+import random
 import numpy as np
+import timeit
 
 
 class GTCLU:
@@ -44,13 +46,7 @@ class GTCLU:
         elif self.algo == "tree":
             # print("building tree")
             tree = GridTree(
-                self.table,
-                self.d,
-                self.minpts,
-                self.epsilon,
-                0,
-                self.coord_split,
-                level=self.tree_level,
+                self.table, self.d, self.minpts, self.epsilon, 0, self.coord_split - 1
             )
             tree.fit()
             self.clusters = tree.clusters
@@ -202,7 +198,16 @@ class Grid:
 
 class GridTree:
     def __init__(
-        self, table, dimension, min_pts, epsilon, dim_lower, dim_high, level=10
+        self,
+        table,
+        dimension,
+        min_pts,
+        epsilon,
+        dim_lower,
+        dim_high,
+        split_threshold=100,
+        split_dim_threshold=1,
+        limit_depth=100,
     ):
         """A grid tree for parallel gbscan algorithm
         Args:
@@ -210,39 +215,25 @@ class GridTree:
             dim_lower,dim_high: 0 and coord_split number
         """
         self.table = table
+        self.grids = list(table.values())
         self.epsilon = epsilon
         self.threshold = epsilon  # threshold for merging grids
         self.dimension = dimension
-        # self.grid_width = grid_width
         # It depends on the design of the grid splitting, here we use 1
-        self.grid_width = 1
         self.min_pts = min_pts
-        self.level = level
-        self.level_dim = self._cal_level_dim()
+        self.split_threshold = split_threshold
+        self.split_dim_threshold = split_dim_threshold
+        self.limit_depth = limit_depth
+        self.grid_width = 1
 
-        self.level_nodes = [[] for _ in range(self.level + 1)]
-        self.grids = list(table.values())
+        self.level_nodes = []
+        self.leaves = []
+
         self.dim_bounds = [[dim_lower, dim_high] for _ in range(self.dimension)]
-        self.root = self._build_tree(0, self.grids, self.dim_bounds)
+        self.root = None
         self.clusters = []
 
-    def _cal_level_dim(self):
-        """Calculate the level of the grid tree
-        Let level = k+1,
-        where k is the minimum integer that 2^k >= cpu_nums
-        """
-        level = self.level
-
-        level_dim = []
-        if level > self.dimension:
-            for i in range(level + 1):
-                level_dim.append(i % self.dimension)
-        else:
-            for i in range(level + 1):
-                level_dim.append(i)
-        return level_dim
-
-    def _build_tree(self, which_level, grids, dim_bounds):
+    def build_tree(self, which_level, grids, dim_bounds):
         """Build the grid tree
         Args:
             which_level: the level of the tree
@@ -251,15 +242,29 @@ class GridTree:
         if not grids:
             return None
 
+        # select a dimension to split which should be in a large range
+        which_dim = random.randint(0, self.dimension - 1)
+        dim_range = self.dim_bounds[which_dim][1] - self.dim_bounds[which_dim][0]
+        for _ in range(3):
+            dim = random.randint(0, self.dimension - 1)
+            tem_range = self.dim_bounds[dim][1] - self.dim_bounds[dim][0]
+            if tem_range > dim_range:
+                which_dim = dim
+                dim_range = tem_range
+
         # reach to the leaf level, return leaf node
-        if which_level == self.level:
-            leaf_node = TreeNode(self.level_dim[which_level], grids)
-            self.level_nodes[which_level].append(leaf_node)
-            return leaf_node
+        # reach to the leaf level, return leaf node
+        if (
+            which_level == self.limit_depth
+            or len(grids) <= self.split_threshold
+            or dim_range < self.split_dim_threshold
+        ):
+            node = TreeNode(grids)
+            self.leaves.append(node)
+            return node
 
         l_edges, r_edges = {}, {}
         l_grids, r_grids = [], []
-        which_dim = self.level_dim[which_level]
         edge = (dim_bounds[which_dim][0] + dim_bounds[which_dim][1]) // 2
         for grid in grids:
             if grid.pos[which_dim] <= edge:
@@ -292,32 +297,38 @@ class GridTree:
         l_dim_bounds[which_dim][1] = edge
         r_dim_bounds[which_dim][0] = edge + 1
 
-        l_node = self._build_tree(which_level + 1, l_grids, l_dim_bounds)
-        r_node = self._build_tree(which_level + 1, r_grids, r_dim_bounds)
+        l_node = self.build_tree(which_level + 1, l_grids, l_dim_bounds)
+        r_node = self.build_tree(which_level + 1, r_grids, r_dim_bounds)
 
         node.l_node = l_node
         node.r_node = r_node
+        while len(self.level_nodes) <= which_level:
+            self.level_nodes.append([])
         self.level_nodes[which_level].append(node)
         return node
 
     def fit(self):
         """Cluster the grid tree"""
-
+        # 0. build the tree
+        start = timeit.default_timer()
+        self.root = self.build_tree(0, self.grids, self.dim_bounds)
+        print("build tree time: ", timeit.default_timer() - start)
         # 1. cluster the leaf nodes
-        # print("cluster leaves")
+        start = timeit.default_timer()
         self.cluster_leaves()
+        print("cluster leaves time: ", timeit.default_timer() - start)
 
         # 2. cluster the non-leaf nodes
-        # print("cluster non-leaves")
-        for level in range(self.level - 1, -1, -1):
+        start = timeit.default_timer()
+        for level in range(len(self.level_nodes) - 1, -1, -1):
             for node in self.level_nodes[level]:
                 self._merge_children(node)
-
+        print("cluster non-leaves time: ", timeit.default_timer() - start)
         self.clusters = self.root.clusters
 
     def cluster_leaves(self):
         """Cluster the leaf nodes"""
-        for node in self.level_nodes[self.level]:
+        for node in self.leaves:
             self._cluster_leaf_node(node)
 
     def _cluster_leaf_node(self, node):
@@ -484,7 +495,7 @@ class GridTree:
 
 
 class TreeNode:
-    def __init__(self, which_dim, grids=None):
+    def __init__(self, grids=None, which_dim=0):
         self.which_dim = which_dim
         self.grids = grids  # leaf node holds the grids
         self.l_edges = {}

@@ -7,16 +7,16 @@ from gtclu.test.util import read_labels, gen_paras, purity
 
 record = "/home/doors/Code/GTCLU/gtclu/test/record.txt"
 
-dataset = "50k-20d-10c"
-d = 20
+dataset = "s3"
+d = 2
 # e = 0.048
 # m = 7
 
-E = gen_paras(0.5, 0.5, 0.2)
-M = gen_paras(10, 10, 1)
+E = gen_paras(0.01, 0.08, 0.001)
+M = gen_paras(1, 20, 1)
 
-sf = "/home/doors/Code/dataset/big/" + dataset
-cf = "/home/doors/Code/dataset/big/" + dataset + "-class"
+sf = "/home/doors/Code/dataset/small/" + dataset
+cf = "/home/doors/Code/dataset/small/" + dataset + "-class"
 
 labels = read_labels(cf)
 max_ari = -1
