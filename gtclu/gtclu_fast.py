@@ -1,6 +1,7 @@
 import copy
 import math
 import random
+import timeit
 from collections import deque
 
 import numpy as np
@@ -174,6 +175,7 @@ class Grid:
         self.core = False
         self.cluster = -1
         self.extra_weight = 0
+        self.edge_num = 0
 
     def add_point(self, x):
         self.weight += 1
@@ -207,6 +209,7 @@ class GridTree:
         dim_lower,
         dim_high,
         split_threshold=200,
+        limit_depth=100,
     ):
         """A grid tree for parallel gbscan algorithm
         Args:
@@ -218,10 +221,10 @@ class GridTree:
         self.epsilon = epsilon
         self.threshold = epsilon  # threshold for merging grids
         self.dimension = dimension
-        # self.grid_width = grid_width
         # It depends on the design of the grid splitting, here we use 1
         self.min_pts = min_pts
         self.split_threshold = split_threshold
+        self.limit_depth = limit_depth
         self.grid_width = 1
 
         self.level_nodes = []
@@ -230,22 +233,6 @@ class GridTree:
         self.dim_bounds = [[dim_lower, dim_high] for _ in range(self.dimension)]
         self.root = None
         self.clusters = []
-
-    # def _cal_level_dim(self):
-    #    """Calculate the level of the grid tree
-    #    Let level = k+1,
-    #    where k is the minimum integer that 2^k >= cpu_nums
-    #    """
-    #    level = self.level
-
-    #    level_dim = []
-    #    if level > self.dimension:
-    #        for i in range(level + 1):
-    #            level_dim.append(i % self.dimension)
-    #    else:
-    #        for i in range(level + 1):
-    #            level_dim.append(i)
-    #    return level_dim
 
     def build_tree(self, which_level, grids, dim_bounds):
         """Build the grid tree
@@ -259,7 +246,7 @@ class GridTree:
         # select a dimension to split which should be in a large range
         which_dim = random.randint(0, self.dimension - 1)
         dim_range = self.dim_bounds[which_dim][1] - self.dim_bounds[which_dim][0]
-        for i in range(5):
+        for _ in range(3):
             dim = random.randint(0, self.dimension - 1)
             tem_range = self.dim_bounds[dim][1] - self.dim_bounds[dim][0]
             if tem_range > dim_range:
@@ -267,7 +254,11 @@ class GridTree:
                 dim_range = tem_range
 
         # reach to the leaf level, return leaf node
-        if len(grids) <= self.split_threshold or dim_range < 2:
+        if (
+            which_level == self.limit_depth
+            or len(grids) <= self.split_threshold
+            or dim_range < 2
+        ):
             node = TreeNode(grids)
             self.leaves.append(node)
             return node
@@ -297,9 +288,6 @@ class GridTree:
             l_ball_tree = BallTree(l_centers, leaf_size=200, metric="euclidean")
             r_ball_tree = BallTree(r_centers, leaf_size=200, metric="euclidean")
 
-            # l_edges_avg_weight = l_edges_weight / len(l_edges)
-            # r_edges_avg_weight = r_edges_weight / len(r_edges)
-
             # get extra-weights and edge-neighbors of edge-grids
             l_indexs = r_ball_tree.query_radius(l_centers, self.threshold)
             r_indexs = l_ball_tree.query_radius(r_centers, self.threshold)
@@ -307,15 +295,12 @@ class GridTree:
             for i, indexs in enumerate(l_indexs):
                 if indexs.any():
                     l_neighbors[l_edges[i].pos] = [r_edges[j] for j in indexs]
-                    l_edges[i].extra_weight += 0.5 * sum(
-                        [r_edges[j].weight for j in indexs]
-                    )
+                    l_edges[i].edge_num += len(indexs)
             for i, indexs in enumerate(r_indexs):
                 if indexs.any():
                     r_neighbors[r_edges[i].pos] = [l_edges[j] for j in indexs]
-                    r_edges[i].extra_weight += 0.5 * sum(
-                        [l_edges[j].weight for j in indexs]
-                    )
+                    r_edges[i].edge_num += len(indexs)
+
         # non-leaf node
         node = TreeNode(which_dim=which_dim)
         node.l_edges, node.r_edges = l_neighbors, r_neighbors
@@ -336,18 +321,20 @@ class GridTree:
 
     def fit(self):
         """Cluster the grid tree"""
+        start = timeit.default_timer()
         self.root = self.build_tree(0, self.grids, self.dim_bounds)
-
+        print("build tree time: ", timeit.default_timer() - start)
         # 1. cluster the leaf nodes
-        # print("cluster leaves")
+        start = timeit.default_timer()
         self.cluster_leaves()
+        print("cluster leaves time: ", timeit.default_timer() - start)
 
         # 2. cluster the non-leaf nodes
-        # print("cluster non-leaves")
+        start = timeit.default_timer()
         for level in range(len(self.level_nodes) - 1, -1, -1):
             for node in self.level_nodes[level]:
                 self._merge_children(node)
-
+        print("cluster non-leaves time: ", timeit.default_timer() - start)
         self.clusters = self.root.clusters
 
     def cluster_leaves(self):
@@ -369,13 +356,15 @@ class GridTree:
         ball_tree = BallTree(centers, leaf_size=200, metric="euclidean")
         indexs = ball_tree.query_radius(centers, self.threshold)
 
-        # avg_weight = sum([grid.weight for grid in grids]) / len(grids)
-
         for i, index in enumerate(indexs):
             near_grids[grids[i].pos] = []
             if index.any():
                 near_grids[grids[i].pos] = [grids[j] for j in index]
-                grids[i].extra_weight += 0.5 * sum([grids[j].weight for j in index])
+                grids[i].extra_weight += (
+                    0.5
+                    * (sum([grids[j].weight for j in index]) / len(index))
+                    * (len(index) + grids[i].edge_num)
+                )
 
             if grids[i].weight + grids[i].extra_weight >= self.min_pts:
                 cores.append(grids[i])
@@ -400,17 +389,12 @@ class GridTree:
 
         # 3. cluster the border grids
         for grid in borders:
-            max_weigh = 0
-            max_grid = None
             for near_grid in near_grids[grid.pos]:
-                if near_grid.core and near_grid.weight > max_weigh:
-                    max_weigh = near_grid.weight
-                    max_grid = near_grid
-            if max_grid is not None:
-                grid.cluster = max_grid.cluster
-                clusters[max_grid.cluster].add(grid)
+                if near_grid.core:
+                    grid.cluster = near_gird.cluster
+                    clusters[near_gird.cluster].add(grid)
+                    break
 
-        # 4. assign the clusters to the node
         node.clusters = clusters
 
     def _merge_children(self, node):

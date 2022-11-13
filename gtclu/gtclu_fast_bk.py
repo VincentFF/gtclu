@@ -1,6 +1,7 @@
 import copy
 import math
 import random
+import timeit
 from collections import deque
 
 import numpy as np
@@ -174,6 +175,7 @@ class Grid:
         self.core = False
         self.cluster = -1
         self.extra_weight = 0
+        self.edge_num = 0
 
     def add_point(self, x):
         self.weight += 1
@@ -294,8 +296,8 @@ class GridTree:
 
             l_centers = [grid.center for grid in l_edges]
             r_centers = [grid.center for grid in r_edges]
-            l_ball_tree = BallTree(l_centers, leaf_size=100, metric="euclidean")
-            r_ball_tree = BallTree(r_centers, leaf_size=100, metric="euclidean")
+            l_ball_tree = BallTree(l_centers, leaf_size=200, metric="euclidean")
+            r_ball_tree = BallTree(r_centers, leaf_size=200, metric="euclidean")
 
             # l_edges_avg_weight = l_edges_weight / len(l_edges)
             # r_edges_avg_weight = r_edges_weight / len(r_edges)
@@ -306,20 +308,18 @@ class GridTree:
 
             for i, indexs in enumerate(l_indexs):
                 if indexs.any():
-                    sum_weight = 0
-                    l_neighbors[l_edges[i].pos] = []
-                    for j in indexs:
-                        sum_weight += r_edges[j].weight
-                        l_neighbors[l_edges[i].pos].append(r_edges[j])
-                    l_edges[i].extra_weight = 0.5 * sum_weight
+                    l_neighbors[l_edges[i].pos] = [r_edges[j] for j in indexs]
+                    l_edges[i].edge_num += len(indexs)
+                    # l_edges[i].extra_weight += 0.5 * sum(
+                    #    [r_edges[j].weight for j in indexs]
+                    # )
             for i, indexs in enumerate(r_indexs):
                 if indexs.any():
-                    sum_weight = 0
-                    r_neighbors[r_edges[i].pos] = []
-                    for j in indexs:
-                        sum_weight += l_edges[j].weight
-                        r_neighbors[r_edges[i].pos].append(l_edges[j])
-                    r_edges[i].extra_weight = 0.5 * sum_weight
+                    r_neighbors[r_edges[i].pos] = [l_edges[j] for j in indexs]
+                    r_edges[i].edge_num += len(indexs)
+                    # r_edges[i].extra_weight += 0.5 * sum(
+                    #    [l_edges[j].weight for j in indexs]
+                    # )
         # non-leaf node
         node = TreeNode(which_dim=which_dim)
         node.l_edges, node.r_edges = l_neighbors, r_neighbors
@@ -340,18 +340,22 @@ class GridTree:
 
     def fit(self):
         """Cluster the grid tree"""
+        start = timeit.default_timer()
         self.root = self.build_tree(0, self.grids, self.dim_bounds)
-
+        print("build tree time: ", timeit.default_timer() - start)
         # 1. cluster the leaf nodes
         # print("cluster leaves")
+        start = timeit.default_timer()
         self.cluster_leaves()
+        print("cluster leaves time: ", timeit.default_timer() - start)
 
         # 2. cluster the non-leaf nodes
         # print("cluster non-leaves")
+        start = timeit.default_timer()
         for level in range(len(self.level_nodes) - 1, -1, -1):
             for node in self.level_nodes[level]:
                 self._merge_children(node)
-
+        print("cluster non-leaves time: ", timeit.default_timer() - start)
         self.clusters = self.root.clusters
 
     def cluster_leaves(self):
@@ -370,19 +374,19 @@ class GridTree:
         borders = []
         near_grids = {}
 
-        ball_tree = BallTree(centers, leaf_size=100, metric="euclidean")
+        ball_tree = BallTree(centers, leaf_size=200, metric="euclidean")
         indexs = ball_tree.query_radius(centers, self.threshold)
 
-        # avg_weight = sum([grid.weight for grid in grids]) / len(grids)
 
         for i, index in enumerate(indexs):
             near_grids[grids[i].pos] = []
             if index.any():
-                sum_weight = 0
-                for j in index:
-                    near_grids[grids[i].pos].append(grids[j])
-                    sum_weight += grids[j].weight
-                grids[i].extra_weight = 0.5 * sum_weight
+                near_grids[grids[i].pos] = [grids[j] for j in index]
+                grids[i].extra_weight += (
+                    0.5
+                    * (sum([grids[j].weight for j in index]) / len(index))
+                    * (len(index) + grids[i].edge_num)
+                )
 
             if grids[i].weight + grids[i].extra_weight >= self.min_pts:
                 cores.append(grids[i])
