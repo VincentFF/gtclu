@@ -208,7 +208,8 @@ class GridTree:
         epsilon,
         dim_lower,
         dim_high,
-        split_threshold=200,
+        split_threshold=100,
+        split_dim_threshold=1,
         limit_depth=100,
     ):
         """A grid tree for parallel gbscan algorithm
@@ -224,6 +225,7 @@ class GridTree:
         # It depends on the design of the grid splitting, here we use 1
         self.min_pts = min_pts
         self.split_threshold = split_threshold
+        self.split_dim_threshold = split_dim_threshold
         self.limit_depth = limit_depth
         self.grid_width = 1
 
@@ -257,7 +259,7 @@ class GridTree:
         if (
             which_level == self.limit_depth
             or len(grids) <= self.split_threshold
-            or dim_range < 2
+            or dim_range < self.split_dim_threshold
         ):
             node = TreeNode(grids)
             self.leaves.append(node)
