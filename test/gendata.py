@@ -1,19 +1,21 @@
 from sklearn.datasets import make_blobs
 
-name = "1m-30d-10c"
-forder = "/home/doors/Code/stream/dataset/origin"
+name = "100k-30d-5c"
+forder = "/home/doors/Code/dataset/origin"
 
 file = forder + "/" + name
-label = "/home/doors/Code/stream/dataset/big/" + name + "-class"
+label = "/home/doors/Code/dataset/big/" + name + "-class"
 
 
-X, y = make_blobs(n_samples=1000000, centers=10, n_features=30, random_state=0)
+X, y = make_blobs(
+    n_samples=100000, centers=5, n_features=30, shuffle=True, random_state=0
+)
 
-with open(label, 'w') as f:
+with open(label, "w") as f:
     for i in y:
-        f.write(str(i)+"\n")
+        f.write(str(i) + "\n")
 
-with open(file, 'w') as f:
+with open(file, "w") as f:
     for data in X:
         line = ",".join(map(str, data))
-        f.write(line+"\n")
+        f.write(line + "\n")

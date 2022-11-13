@@ -1,4 +1,4 @@
-with open("./skin-memory.log") as fl:
+with open("./memeory.txt") as fl:
     res = 0
     line = fl.readline().strip()
     while line:

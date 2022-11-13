@@ -1,18 +1,18 @@
-from gtclu.gtclu.gtclu import GTCLU
+from gtclu.gtclu.gtclu_fast import GTCLU
 import timeit
 import numpy as np
 
 record = "/home/doors/Code/GTCLU/gtclu/test/time-record"
 
-dataset = "100k-15d-10c"
-d = 15
-e = 0.7
+dataset = "50k-20d-10c"
+d = 20
+e = 0.5
 m = 10
 
 
 sf = "/home/doors/Code/dataset/big/" + dataset
 
-gtclu = GTCLU(e, m, d, algo="tree", tree_level=20)
+gtclu = GTCLU(e, m, d, algo="tree")
 fp = open(sf)
 start = timeit.default_timer()
 line = fp.readline().strip()
@@ -24,7 +24,6 @@ fp.close()
 print("start fit")
 gtclu.fit()
 print(len(gtclu.clusters))
-print(len(gtclu.clusters[0]))
 end = timeit.default_timer()
 
 print(end - start)

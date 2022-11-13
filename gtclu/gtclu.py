@@ -4,7 +4,7 @@ import copy
 import numpy as np
 
 
-class GBSCAN:
+class GTCLU:
     def __init__(self, epsilon, minpts, d, algo="bfs", tree_level=10):
         self.epsilon = epsilon
         self.minpts = minpts
@@ -18,7 +18,7 @@ class GBSCAN:
         self.edges = {}
         self.flag = 0
 
-        self.width = 2 * epsilon / math.sqrt(d)
+        self.width = epsilon / math.sqrt(d)
         self.coord_split = int(math.floor(1 / self.width))
         if algo == "bfs":
             self.directions = self._directions(d)
@@ -42,15 +42,21 @@ class GBSCAN:
         if self.algo == "bfs":
             self._bfs_clustering()
         elif self.algo == "tree":
-            tree = GridTree(self.table, self.d, self.minpts,
-                            self.epsilon, 0, self.coord_split,
-                            level=self.tree_level)
+            # print("building tree")
+            tree = GridTree(
+                self.table,
+                self.d,
+                self.minpts,
+                self.epsilon,
+                0,
+                self.coord_split,
+                level=self.tree_level,
+            )
             tree.fit()
             self.clusters = tree.clusters
 
         else:
-            raise ValueError(
-                "Unknown algorithm parameter: {}".format(self.algo))
+            raise ValueError("Unknown algorithm parameter: {}".format(self.algo))
 
     def _check_cores(self):
         for pos, grid in self.table.items():
@@ -129,8 +135,7 @@ class GBSCAN:
                         max_core_weight = near_grid.weight
             else:
                 for direct in self.directions:
-                    near_pos = tuple([pos[i] + direct[i]
-                                     for i in range(self.d)])
+                    near_pos = tuple([pos[i] + direct[i] for i in range(self.d)])
                     if near_pos not in self.table:
                         continue
                     near_grid = self.table[near_pos]
@@ -196,8 +201,9 @@ class Grid:
 
 
 class GridTree:
-    def __init__(self, table, dimension, min_pts, epsilon,
-                 dim_lower, dim_high, level=10):
+    def __init__(
+        self, table, dimension, min_pts, epsilon, dim_lower, dim_high, level=10
+    ):
         """A grid tree for parallel gbscan algorithm
         Args:
             table: a dict of grid table
@@ -205,7 +211,7 @@ class GridTree:
         """
         self.table = table
         self.epsilon = epsilon
-        self.threshold = 2 * epsilon  # threshold for merging grids
+        self.threshold = epsilon  # threshold for merging grids
         self.dimension = dimension
         # self.grid_width = grid_width
         # It depends on the design of the grid splitting, here we use 1
@@ -216,8 +222,7 @@ class GridTree:
 
         self.level_nodes = [[] for _ in range(self.level + 1)]
         self.grids = list(table.values())
-        self.dim_bounds = [[dim_lower, dim_high]
-                           for _ in range(self.dimension)]
+        self.dim_bounds = [[dim_lower, dim_high] for _ in range(self.dimension)]
         self.root = self._build_tree(0, self.grids, self.dim_bounds)
         self.clusters = []
 
@@ -242,7 +247,7 @@ class GridTree:
         Args:
             which_level: the level of the tree
         """
-        print("building tree level: ", which_level)
+        # print("building tree level: ", which_level)
         if not grids:
             return None
 
@@ -299,12 +304,12 @@ class GridTree:
         """Cluster the grid tree"""
 
         # 1. cluster the leaf nodes
-        print("cluster leaves")
+        # print("cluster leaves")
         self.cluster_leaves()
 
         # 2. cluster the non-leaf nodes
-        print("cluster non-leaves")
-        for level in range(self.level-1, -1, -1):
+        # print("cluster non-leaves")
+        for level in range(self.level - 1, -1, -1):
             for node in self.level_nodes[level]:
                 self._merge_children(node)
 
@@ -421,8 +426,7 @@ class GridTree:
                 for near_grid in r_edges[pos]:
                     if near_grid.core:
                         if r_grid.cluster in merge_table:
-                            merge_table[r_grid.cluster].add(
-                                near_grid.cluster)
+                            merge_table[r_grid.cluster].add(near_grid.cluster)
                         else:
                             merge_table[r_grid.cluster] = {near_grid.cluster}
         for c in merge_table:
@@ -483,13 +487,11 @@ class TreeNode:
     def __init__(self, which_dim, grids=None):
         self.which_dim = which_dim
         self.grids = grids  # leaf node holds the grids
-        # {pos1:[r_edge_near_grids],...}  :non-leaf node holds the edges
         self.l_edges = {}
         self.r_edges = {}  # non-leaf node holds the edges
         self.l_node = None
         self.r_node = None
         self.clusters = []
-        # self.noises = []
 
 
 class Cluster:

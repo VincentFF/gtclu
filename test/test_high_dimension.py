@@ -1,57 +1,61 @@
-from sgdbscan.cluster.gbscan_single import GBSCAN
+# from gtclu.gtclu.gtclu import GTCLU
+from gtclu.gtclu.gtclu_fast import GTCLU
 import timeit
 import numpy as np
 from sklearn.metrics import adjusted_rand_score, adjusted_mutual_info_score
-from sgdbscan.test.util import read_labels, gen_paras
+from gtclu.test.util import read_labels, gen_paras, purity
 
-record = "/home/doors/Code/stream/sgdbscan/test/gbscan-record"
+record = "/home/doors/Code/GTCLU/gtclu/test/record.txt"
 
-dataset = "1m-30d-10c"
-d = 30
+dataset = "50k-20d-10c"
+d = 20
 # e = 0.048
 # m = 7
 
-E = gen_paras(0.5, 0.5, 1)
-M = gen_paras(20, 20, 1)
+E = gen_paras(0.5, 0.5, 0.2)
+M = gen_paras(10, 10, 1)
 
-sf = "/home/doors/Code/stream/dataset/big/"+dataset
-cf = "/home/doors/Code/stream/dataset/big/"+dataset+"-class"
+sf = "/home/doors/Code/dataset/big/" + dataset
+cf = "/home/doors/Code/dataset/big/" + dataset + "-class"
 
 labels = read_labels(cf)
 max_ari = -1
+max_metircs = ()
+max_paras = ()
+time_cost = 0
 for e in E:
     for m in M:
-        gbscan = GBSCAN(e, m, d, algo="tree", tree_level=15)
+        gbscan = GTCLU(e, m, d, algo="tree")
         fp = open(sf)
         start = timeit.default_timer()
         line = fp.readline().strip()
         while line:
-            p = np.array(list(map(lambda x: float(x), line.split(','))))
+            p = np.array(list(map(lambda x: float(x), line.split(","))))
             gbscan.learn_one(p)
             line = fp.readline().strip()
         fp.close()
         gbscan.fit()
-        print(len(gbscan.clusters))
-        print(gbscan.clusters)
+        # print(len(gbscan.clusters))
+        # print(gbscan.clusters)
         end = timeit.default_timer()
 
         prelabels = []
         with open(sf) as fp:
             line = fp.readline().strip()
             while line:
-                p = np.array(
-                    list(map(lambda x: float(x), line.split(','))))
+                p = np.array(list(map(lambda x: float(x), line.split(","))))
                 y = gbscan.predict_one(p)
                 prelabels.append(y)
                 line = fp.readline().strip()
 
         ami = adjusted_mutual_info_score(labels, prelabels)
         ari = adjusted_rand_score(labels, prelabels)
+        pur = purity(labels, prelabels)
 
         if ari > max_ari:
             max_ari = ari
-            max_metircs = (ari, ami)
+            max_metircs = (ari, ami, pur)
             max_paras = (e, m)
-            time_cost = end-start
-        print(max_metircs, max_paras, (ari, ami), (e, m))
+            time_cost = end - start
+        print(max_metircs, max_paras, (ari), (e, m))
 print("Result:   ", max_paras, max_metircs, time_cost)
