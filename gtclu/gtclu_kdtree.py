@@ -1,12 +1,15 @@
-from collections import deque
-from sklearn.neighbors import BallTree
-import math
 import copy
+import math
+import random
+import timeit
+from collections import deque
+
 import numpy as np
+from sklearn.neighbors import KDTree
 
 
 class GTCLU:
-    def __init__(self, epsilon, minpts, d, algo="bfs", tree_level=10):
+    def __init__(self, epsilon, minpts, d, algo="bfs"):
         self.epsilon = epsilon
         self.minpts = minpts
         self.d = d
@@ -20,12 +23,9 @@ class GTCLU:
         self.flag = 0
 
         self.width = epsilon / math.sqrt(d)
-        self.coord_split = int(math.ceil(1 / self.width))
+        self.coord_split = int(math.floor(1 / self.width))
         if algo == "bfs":
             self.directions = self._directions(d)
-        else:
-            self.tree_level = tree_level
-
         self.clusters = []
 
     def learn_one(self, x):
@@ -45,13 +45,7 @@ class GTCLU:
         elif self.algo == "tree":
             # print("building tree")
             tree = GridTree(
-                self.table,
-                self.d,
-                self.minpts,
-                self.epsilon,
-                0,
-                self.coord_split,
-                level=self.tree_level,
+                self.table, self.d, self.minpts, self.epsilon, 0, self.coord_split - 1
             )
             tree.fit()
             self.clusters = tree.clusters
@@ -73,13 +67,12 @@ class GTCLU:
                     tem_pos = tuple([pos[i] + d[i] for i in range(self.d)])
                     if tem_pos in self.table:
                         tem_grid = self.table[tem_pos]
-                        dis = np.linalg.norm(center - tem_grid.center)
-                        if dis == 0:
-                            near_weight != tem_grid.weight
-                        else:
-                            near_weight += tem_grid.weight * min(
-                                0.5 * self.epsilon / dis, 1
-                            )
+                        near_weight += tem_grid.weight * min(
+                            0.5
+                            * self.epsilon
+                            / np.linalg.norm(center - tem_grid.center),
+                            1,
+                        )
                         self.edges[pos].append(tem_pos)
                 if near_weight + grid.weight >= self.minpts:
                     self.cores.append(pos)
@@ -182,6 +175,7 @@ class Grid:
         self.core = False
         self.cluster = -1
         self.extra_weight = 0
+        self.edge_num = 0
 
     def add_point(self, x):
         self.weight += 1
@@ -201,10 +195,22 @@ class Grid:
     def __repr__(self):
         return self.__str__()
 
+    def __hash__(self) -> int:
+        return hash(self.pos)
+
 
 class GridTree:
     def __init__(
-        self, table, dimension, min_pts, epsilon, dim_lower, dim_high, level=10
+        self,
+        table,
+        dimension,
+        min_pts,
+        epsilon,
+        dim_lower,
+        dim_high,
+        split_threshold=100,
+        split_dim_threshold=1,
+        limit_depth=100,
     ):
         """A grid tree for parallel gbscan algorithm
         Args:
@@ -212,39 +218,25 @@ class GridTree:
             dim_lower,dim_high: 0 and coord_split number
         """
         self.table = table
-        self.epsilon = epsilon
-        self.threshold = 2 * epsilon  # threshold for merging grids
-        self.dimension = dimension
-        # self.grid_width = grid_width
-        # It depends on the design of the grid splitting, here we use 1
-        self.grid_width = 1
-        self.min_pts = min_pts
-        self.level = level
-        self.level_dim = self._cal_level_dim()
-
-        self.level_nodes = [[] for _ in range(self.level + 1)]
         self.grids = list(table.values())
+        self.epsilon = epsilon
+        self.threshold = epsilon  # threshold for merging grids
+        self.dimension = dimension
+        # It depends on the design of the grid splitting, here we use 1
+        self.min_pts = min_pts
+        self.split_threshold = split_threshold
+        self.split_dim_threshold = split_dim_threshold
+        self.limit_depth = limit_depth
+        self.grid_width = 1
+
+        self.level_nodes = []
+        self.leaves = []
+
         self.dim_bounds = [[dim_lower, dim_high] for _ in range(self.dimension)]
-        self.root = self._build_tree(0, self.grids, self.dim_bounds)
+        self.root = None
         self.clusters = []
 
-    def _cal_level_dim(self):
-        """Calculate the level of the grid tree
-        Let level = k+1,
-        where k is the minimum integer that 2^k >= cpu_nums
-        """
-        level = self.level
-
-        level_dim = []
-        if level > self.dimension:
-            for i in range(level + 1):
-                level_dim.append(i % self.dimension)
-        else:
-            for i in range(level + 1):
-                level_dim.append(i)
-        return level_dim
-
-    def _build_tree(self, which_level, grids, dim_bounds):
+    def build_tree(self, which_level, grids, dim_bounds):
         """Build the grid tree
         Args:
             which_level: the level of the tree
@@ -253,164 +245,136 @@ class GridTree:
         if not grids:
             return None
 
+        # select a dimension to split which should be in a large range
+        which_dim = random.randint(0, self.dimension - 1)
+        dim_range = self.dim_bounds[which_dim][1] - self.dim_bounds[which_dim][0]
+        for _ in range(3):
+            dim = random.randint(0, self.dimension - 1)
+            tem_range = self.dim_bounds[dim][1] - self.dim_bounds[dim][0]
+            if tem_range > dim_range:
+                which_dim = dim
+                dim_range = tem_range
+
         # reach to the leaf level, return leaf node
-        if which_level == self.level:
-            leaf_node = TreeNode(self.level_dim[which_level], grids)
-            self.level_nodes[which_level].append(leaf_node)
-            return leaf_node
+        if (
+            which_level == self.limit_depth
+            or len(grids) <= self.split_threshold
+            or dim_range < self.split_dim_threshold
+        ):
+            node = TreeNode(grids)
+            self.leaves.append(node)
+            return node
 
         l_edges, r_edges = [], []
+        l_edges_weight, r_edges_weight = 0, 0
         l_grids, r_grids = [], []
-        which_dim = self.level_dim[which_level]
         edge = (dim_bounds[which_dim][0] + dim_bounds[which_dim][1]) // 2
         for grid in grids:
             if grid.pos[which_dim] <= edge:
                 l_grids.append(grid)
                 if grid.pos[which_dim] == edge:
                     l_edges.append(grid)
+                    l_edges_weight += grid.weight
             else:
                 r_grids.append(grid)
                 if grid.pos[which_dim] == edge + 1:
                     r_edges.append(grid)
+                    r_edges_weight += grid.weight
 
+        l_neighbors = {}
+        r_neighbors = {}
         if l_edges and r_edges:
-
-            l_neighbors = {grid.pos: [] for grid in l_edges}
-            r_neighbors = {grid.pos: [] for grid in r_edges}
 
             l_centers = [grid.center for grid in l_edges]
             r_centers = [grid.center for grid in r_edges]
-            l_ball_tree = BallTree(l_centers, leaf_size=100, metric="euclidean")
+            l_kdtree = KDTree(l_centers, leaf_size=200, metric="euclidean")
+            r_kdtree = KDTree(r_centers, leaf_size=200, metric="euclidean")
 
             # get extra-weights and edge-neighbors of edge-grids
-            indexs = l_ball_tree.query_radius(r_centers, self.threshold)
-            for i, index in enumerate(indexs):
-                grid_r = r_edges[i]
-                for j in index:
-                    grid_l = l_edges[j]
-                    l_neighbors[grid_l.pos].append(grid_r)
-                    r_neighbors[grid_r.pos].append(grid_l)
-                    dis = np.linalg.norm(grid_l.center - grid_r.center)
-                    sigma = min(0.5 * self.epsilon / dis, 1) if dis != 0 else 1
-                    grid_l.extra_weight += sigma * grid_r.weight
-                    grid_r.extra_weight += sigma * grid_l.weight
-        else:
-            l_neighbors = dict()
-            r_neighbors = dict()
+            l_indexs = r_kdtree.query_radius(l_centers, self.threshold)
+            r_indexs = l_kdtree.query_radius(r_centers, self.threshold)
+            del l_kdtree, r_kdtree
 
-        node = TreeNode(which_dim)
+            for i, indexs in enumerate(l_indexs):
+                if indexs.any():
+                    l_neighbors[l_edges[i].pos] = [r_edges[j] for j in indexs]
+                    l_edges[i].edge_num += len(indexs)
+            for i, indexs in enumerate(r_indexs):
+                if indexs.any():
+                    r_neighbors[r_edges[i].pos] = [l_edges[j] for j in indexs]
+                    r_edges[i].edge_num += len(indexs)
+
+        # non-leaf node
+        node = TreeNode(which_dim=which_dim)
         node.l_edges, node.r_edges = l_neighbors, r_neighbors
         l_dim_bounds = copy.deepcopy(dim_bounds)
         r_dim_bounds = copy.deepcopy(dim_bounds)
         l_dim_bounds[which_dim][1] = edge
         r_dim_bounds[which_dim][0] = edge + 1
 
-        l_node = self._build_tree(which_level + 1, l_grids, l_dim_bounds)
-        r_node = self._build_tree(which_level + 1, r_grids, r_dim_bounds)
+        l_node = self.build_tree(which_level + 1, l_grids, l_dim_bounds)
+        r_node = self.build_tree(which_level + 1, r_grids, r_dim_bounds)
 
         node.l_node = l_node
         node.r_node = r_node
+        while len(self.level_nodes) <= which_level:
+            self.level_nodes.append([])
         self.level_nodes[which_level].append(node)
         return node
 
     def fit(self):
         """Cluster the grid tree"""
-
+        start = timeit.default_timer()
+        self.root = self.build_tree(0, self.grids, self.dim_bounds)
+        print("build tree time: ", timeit.default_timer() - start)
         # 1. cluster the leaf nodes
-        # print("cluster leaves")
+        start = timeit.default_timer()
         self.cluster_leaves()
+        print("cluster leaves time: ", timeit.default_timer() - start)
 
         # 2. cluster the non-leaf nodes
-        # print("cluster non-leaves")
-        for level in range(self.level - 1, -1, -1):
+        start = timeit.default_timer()
+        for level in range(len(self.level_nodes) - 1, -1, -1):
             for node in self.level_nodes[level]:
                 self._merge_children(node)
-
+        print("cluster non-leaves time: ", timeit.default_timer() - start)
         self.clusters = self.root.clusters
 
     def cluster_leaves(self):
         """Cluster the leaf nodes"""
-        for node in self.level_nodes[self.level]:
-            self._cluster_leaf(node)
-
-    def _cluster_leaf(self, node):
-        """Cluster the leaf node"""
-
-        if not node or not node.grids:
-            return
-
-        grids = node.grids
-        centers = [grid.center for grid in grids]
-
-        ball_tree = BallTree(centers, leaf_size=100, metric="euclidean")
-        indexs = ball_tree.query_radius(centers, self.threshold)
-
-        # check core grids
-        for i, index in enumerate(indexs):
-            grid_i = grids[i]
-            if grid_i.weight + grid_i.extra_weight >= self.min_pts:
-                grid_i.core = True
-                continue
-            for j in index:
-                grid_j = grids[j]
-                dis = np.linalg.norm(grid_i.center - grid_j.center)
-                sigma = min(0.5 * self.epsilon / dis, 1) if dis != 0 else 1
-                grid_i.extra_weight += sigma * grid_j.weight
-                if grid_i.weight + grid_i.extra_weight >= self.min_pts:
-                    grid_i.core = True
-                    break
-
-        # bfs clustering
-        clusters = []
-        flag = 0
-        visited = [False] * len(grids)
-        for i in range(len(grids)):
-            if visited[i] or not grids[i].core:
-                continue
-            que = deque([i])
-            clusters.append(set())
-            while que:
-                j = que.popleft()
-                visited[j] = True
-                grids[j].cluster = flag
-                clusters[flag].add(grids[j])
-                for neighbor in indexs[j]:
-                    if not visited[neighbor]:
-                        if grids[neighbor].core:
-                            que.append(neighbor)
-                        else:
-                            grids[neighbor].cluster = flag
-                            clusters[flag].add(grids[neighbor])
-            flag += 1
-        node.clusters = clusters
+        for node in self.leaves:
+            self._cluster_leaf_node(node)
 
     def _cluster_leaf_node(self, node):
         """BFS cluster a leaf node"""
         clusters = []  # [{grid1,gird2...}, {grid3,grid4...},...]
         grids = node.grids
+        centers = [grid.center for grid in grids]
         flag = 0
 
         cores = []
         borders = []
-        near_grids = {g.pos: [] for g in grids}
-        # 1. get core grids and border grids
-        for i in range(len(grids)):
-            grid_1 = grids[i]
-            for j in range(i + 1, len(grids)):
-                grid_2 = grids[j]
-                # cache the near grids
-                dis = np.linalg.norm(grid_1.center - grid_2.center)
-                if dis <= self.threshold:
-                    sigma = min(0.5 * self.epsilon / dis, 1)
-                    grid_1.extra_weight += sigma * grid_2.weight
-                    grid_2.extra_weight += sigma * grid_1.weight
-                    near_grids[grid_1.pos].append(grid_2)
-                    near_grids[grid_2.pos].append(grid_1)
-            if grid_1.weight + grid_1.extra_weight >= self.min_pts:
-                cores.append(grid_1)
-                grid_1.core = True
+        near_grids = {}
+
+        kdtree = KDTree(centers, leaf_size=200, metric="euclidean")
+        indexs = kdtree.query_radius(centers, self.threshold)
+        del kdtree
+
+        for i, index in enumerate(indexs):
+            near_grids[grids[i].pos] = []
+            if index.any():
+                near_grids[grids[i].pos] = [grids[j] for j in index]
+                grids[i].extra_weight += (
+                    0.5
+                    * (sum([grids[j].weight for j in index]) / len(index))
+                    * (len(index) + grids[i].edge_num)
+                )
+
+            if grids[i].weight + grids[i].extra_weight >= self.min_pts:
+                cores.append(grids[i])
+                grids[i].core = True
             else:
-                borders.append(grid_1)
+                borders.append(grids[i])
 
         # 2. cluster the core grids
         for grid in cores:
@@ -429,17 +393,12 @@ class GridTree:
 
         # 3. cluster the border grids
         for grid in borders:
-            max_weigh = 0
-            max_grid = None
             for near_grid in near_grids[grid.pos]:
-                if near_grid.core and near_grid.weight > max_weigh:
-                    max_weigh = near_grid.weight
-                    max_grid = near_grid
-            if max_grid is not None:
-                grid.cluster = max_grid.cluster
-                clusters[max_grid.cluster].add(grid)
+                if near_grid.core:
+                    grid.cluster = near_gird.cluster
+                    clusters[near_gird.cluster].add(grid)
+                    break
 
-        # 4. assign the clusters to the node
         node.clusters = clusters
 
     def _merge_children(self, node):
@@ -548,16 +507,17 @@ class GridTree:
 
 
 class TreeNode:
-    def __init__(self, which_dim, grids=None):
+    def __init__(self, grids=None, which_dim=0):
+        self.grids = grids  # leaf node only holds the grids
+
+        # non-leaf node holds the edges and splited_dim
         self.which_dim = which_dim
-        self.grids = grids  # leaf node holds the grids
-        # {pos1:[r_edge_near_grids],...}  :non-leaf node holds the edges
         self.l_edges = {}
-        self.r_edges = {}  # non-leaf node holds the edges
+        self.r_edges = {}
         self.l_node = None
         self.r_node = None
+
         self.clusters = []
-        # self.noises = []
 
 
 class Cluster:

@@ -1,4 +1,3 @@
-# from gtclu.gtclu.gtclu import GTCLU
 from gtclu.gtclu.gtclu_fast import GTCLU
 import timeit
 import numpy as np
@@ -7,16 +6,16 @@ from gtclu.test.util import read_labels, gen_paras, purity
 
 record = "/home/doors/Code/GTCLU/gtclu/test/record.txt"
 
-dataset = "s3"
+dataset = "powersupply"
 d = 2
 # e = 0.048
 # m = 7
 
-E = gen_paras(0.01, 0.08, 0.001)
-M = gen_paras(1, 20, 1)
+E = gen_paras(0.1, 1, 0.1)
+M = gen_paras(1, 5, 1)
 
-sf = "/home/doors/Code/dataset/small/" + dataset
-cf = "/home/doors/Code/dataset/small/" + dataset + "-class"
+sf = "/home/doors/Code/dataset/middle/" + dataset
+cf = "/home/doors/Code/dataset/middle/" + dataset + "-class"
 
 labels = read_labels(cf)
 max_ari = -1
@@ -25,18 +24,18 @@ max_paras = ()
 time_cost = 0
 for e in E:
     for m in M:
-        gbscan = GTCLU(e, m, d, algo="tree")
+        gtclu = GTCLU(e, m, d, algo="tree")
         fp = open(sf)
         start = timeit.default_timer()
         line = fp.readline().strip()
         while line:
             p = np.array(list(map(lambda x: float(x), line.split(","))))
-            gbscan.learn_one(p)
+            gtclu.learn_one(p)
             line = fp.readline().strip()
         fp.close()
-        gbscan.fit()
-        # print(len(gbscan.clusters))
-        # print(gbscan.clusters)
+        gtclu.fit()
+        # print(len(gtclu.clusters))
+        # print(gtclu.clusters)
         end = timeit.default_timer()
 
         prelabels = []
@@ -44,7 +43,7 @@ for e in E:
             line = fp.readline().strip()
             while line:
                 p = np.array(list(map(lambda x: float(x), line.split(","))))
-                y = gbscan.predict_one(p)
+                y = gtclu.predict_one(p)
                 prelabels.append(y)
                 line = fp.readline().strip()
 
@@ -57,5 +56,9 @@ for e in E:
             max_metircs = (ari, ami, pur)
             max_paras = (e, m)
             time_cost = end - start
-        print(max_metircs, max_paras, (ari), (e, m))
-print("Result:   ", max_paras, max_metircs, time_cost)
+        print(max_metircs, max_paras, (ari), (e, m),
+              time_cost, len(gtclu.clusters))
+
+ari, ami, pur = max_metircs
+e, m = max_paras
+print(ari, ami, pur, e, m, time_cost)

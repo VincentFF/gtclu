@@ -3,11 +3,10 @@ import math
 import copy
 import random
 import numpy as np
-import timeit
 
 
 class GTCLU:
-    def __init__(self, epsilon, minpts, d, algo="bfs", tree_level=10):
+    def __init__(self, epsilon, minpts, d, algo="bfs"):
         self.epsilon = epsilon
         self.minpts = minpts
         self.d = d
@@ -24,8 +23,6 @@ class GTCLU:
         self.coord_split = int(math.floor(1 / self.width))
         if algo == "bfs":
             self.directions = self._directions(d)
-        else:
-            self.tree_level = tree_level
 
         self.clusters = []
 
@@ -310,20 +307,20 @@ class GridTree:
     def fit(self):
         """Cluster the grid tree"""
         # 0. build the tree
-        start = timeit.default_timer()
+        # start = timeit.default_timer()
         self.root = self.build_tree(0, self.grids, self.dim_bounds)
-        print("build tree time: ", timeit.default_timer() - start)
+        # print("build tree time: ", timeit.default_timer() - start)
         # 1. cluster the leaf nodes
-        start = timeit.default_timer()
+        # start = timeit.default_timer()
         self.cluster_leaves()
-        print("cluster leaves time: ", timeit.default_timer() - start)
+        # print("cluster leaves time: ", timeit.default_timer() - start)
 
         # 2. cluster the non-leaf nodes
-        start = timeit.default_timer()
+        # start = timeit.default_timer()
         for level in range(len(self.level_nodes) - 1, -1, -1):
             for node in self.level_nodes[level]:
                 self._merge_children(node)
-        print("cluster non-leaves time: ", timeit.default_timer() - start)
+        # print("cluster non-leaves time: ", timeit.default_timer() - start)
         self.clusters = self.root.clusters
 
     def cluster_leaves(self):

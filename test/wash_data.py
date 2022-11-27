@@ -1,8 +1,8 @@
-sf = "/home/doors/Code/dataset/origin/s4.txt"
-df = "/home/doors/Code/dataset/small/s4"
-dc = "/home/doors/Code/dataset/small/sensor-class"
+sf = "/home/doors/Code/dataset/origin/ConfLongDemo_JSI_164860.txt"
+df = "/home/doors/Code/dataset/middle/ConfLongDemo_JSI_164860"
+dc = "/home/doors/Code/dataset/middle/eeg-eye-state-class"
 
-d = 2
+d = 3
 min_max = [[float("inf"), float("-inf")] for i in range(d)]
 
 sd = []
@@ -12,7 +12,7 @@ with open(sf) as fp:
     line = fp.readline().strip()
     while line:
         data = list(map(float, line.split()))
-        # cd.append(data[-1])
+        cd.append(data[-1])
         sd.append(data[:d])
         for i in range(d):
             min_max[i][0] = min(min_max[i][0], float(data[i]))
@@ -20,12 +20,11 @@ with open(sf) as fp:
         line = fp.readline().strip()
 
 # with open(df, "w") as fp1, open(dc, "w") as fp2:
-#     for i in range(len(sd)):
-#         for j in range(d):
-#             sd[i][j] = (sd[i][j] - min_max[j][0]) / \
-#                 (min_max[j][1] - min_max[j][0])
-#         fp1.write(",".join(list(map(str, sd[i])))+"\n")
-#         fp2.write(str(int(cd[i])) + "\n")
+#    for i in range(len(sd)):
+#        for j in range(d):
+#            sd[i][j] = (sd[i][j] - min_max[j][0]) / (min_max[j][1] - min_max[j][0])
+#        fp1.write(",".join(list(map(str, sd[i]))) + "\n")
+#        fp2.write(str(int(cd[i])) + "\n")
 
 with open(df, "w") as fp1:
     for i in range(len(sd)):
