@@ -10,24 +10,24 @@ sys.setrecursionlimit(10000)
 
 datasets = [
     "Aggregation",
-    "Compound",
-    "D31",
-    "flame",
-    "g2-2-30",
-    "g2-4-30",
-    "g2-8-30",
-    "iris",
-    "jain",
-    "letter",
-    "pathbased",
-    "R15",
-    "s1",
-    "s2",
-    "s3",
-    "s4",
-    "skewed",
-    "spiral",
-    "unbalance2",
+    # "Compound",
+    # "D31",
+    # "flame",
+    # "g2-2-30",
+    # "g2-4-30",
+    # "g2-8-30",
+    # "iris",
+    # "jain",
+    # "letter",
+    # "pathbased",
+    # "R15",
+    # "s1",
+    # "s2",
+    # "s3",
+    # "s4",
+    # "skewed",
+    # "spiral",
+    # "unbalance2",
 ]
 
 for dataset in datasets:
@@ -52,7 +52,7 @@ for dataset in datasets:
             clus = op.get_clusters()
             end = timeit.default_timer()
 
-            prelabels = [0] * len(data)
+            prelabels = [-1] * len(data)
 
             for i, v in enumerate(clus):
                 for j in v:
@@ -67,7 +67,7 @@ for dataset in datasets:
                 max_metircs = (ari, ami, pur)
                 max_paras = (e, m)
                 time_cost = end - start
-            # print(max_metircs, max_paras, (ari), (e, m))
+            print(max_metircs, max_paras, (ari), (e, m))
     print(
         dataset,
         max_metircs[0],

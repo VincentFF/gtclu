@@ -10,15 +10,15 @@ sys.setrecursionlimit(50000)
 
 
 datasets = [
-    "g2-8-30",
-    #"letter",
+    "10k-10d-5c",
+    # "letter",
 ]
 
-E = gen_paras(8, 8, 1)
-M = gen_paras(1, 5, 1)
+E = gen_paras(1, 8, 1)
+M = gen_paras(0, 5, 1)
 for dataset in datasets:
-    sf = "/home/doors/Code/dataset/quality/" + dataset
-    cf = "/home/doors/Code/dataset/quality/" + dataset + "-class"
+    sf = "/home/doors/Code/dataset/efficiency/" + dataset
+    cf = "/home/doors/Code/dataset/efficiency/" + dataset + "-class"
 
     labels = read_labels(cf)
     max_ari = -1
@@ -31,41 +31,43 @@ for dataset in datasets:
         # e = int(math.floor(1 / width))
         for m in M:
             start = timeit.default_timer()
-            op = clique(data, e, m, ccore=True)
+            op = clique(data, e, m, ccore=False)
             op.process()
             clus = op.get_clusters()
             end = timeit.default_timer()
+            print(e, end - start, m)
 
-            prelabels = [-1] * len(data)
+    #        prelabels = [-1] * len(data)
 
-            for i, v in enumerate(clus):
-                for j in v:
-                    prelabels[j] = i
+    #        for i, v in enumerate(clus):
+    #            for j in v:
+    #                prelabels[j] = i
 
-            # ri = rand_score(labels, prelabels)
-            # print(dataset, ri, end - start, m)
-            # print(prelabels)
-            ami = adjusted_mutual_info_score(labels, prelabels)
-            ari = adjusted_rand_score(labels, prelabels)
-            pur = purity(labels, prelabels)
-            if ari > max_ari:
-                max_ari = ari
-                max_metircs = (ari, ami, pur)
-                max_paras = (e, m)
-                time_cost = end - start
-            print(
-                dataset,
-                max_metircs[0],
-                max_metircs[1],
-                max_metircs[2],
-                max_paras[0],
-                max_paras[1],
-            )
-    print(
-        dataset,
-        max_metircs[0],
-        max_metircs[1],
-        max_metircs[2],
-        max_paras[0],
-        max_paras[1],
-    )
+    #        # ri = rand_score(labels, prelabels)
+    #        # print(dataset, ri, end - start, m)
+    #        # print(prelabels)
+    #        ami = adjusted_mutual_info_score(labels, prelabels)
+    #        ari = adjusted_rand_score(labels, prelabels)
+    #        pur = purity(labels, prelabels)
+    #        print(ari,e,m)
+    #        if ari > max_ari:
+    #            max_ari = ari
+    #            max_metircs = (ari, ami, pur)
+    #            max_paras = (e, m)
+    #            time_cost = end - start
+    #        print(
+    #            dataset,
+    #            max_metircs[0],
+    #            max_metircs[1],
+    #            max_metircs[2],
+    #            max_paras[0],
+    #            max_paras[1],
+    #        )
+    # print(
+    #    dataset,
+    #    max_metircs[0],
+    #    max_metircs[1],
+    #    max_metircs[2],
+    #    max_paras[0],
+    #    max_paras[1],
+    # )

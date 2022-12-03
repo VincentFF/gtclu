@@ -51,8 +51,7 @@ class GTCLU:
             self.clusters = tree.clusters
 
         else:
-            raise ValueError(
-                "Unknown algorithm parameter: {}".format(self.algo))
+            raise ValueError("Unknown algorithm parameter: {}".format(self.algo))
 
     def _check_cores(self):
         for pos, grid in self.table.items():
@@ -131,8 +130,7 @@ class GTCLU:
                         max_core_weight = near_grid.weight
             else:
                 for direct in self.directions:
-                    near_pos = tuple([pos[i] + direct[i]
-                                     for i in range(self.d)])
+                    near_pos = tuple([pos[i] + direct[i] for i in range(self.d)])
                     if near_pos not in self.table:
                         continue
                     near_grid = self.table[near_pos]
@@ -234,8 +232,7 @@ class GridTree:
         self.level_nodes = []
         self.leaves = []
 
-        self.dim_bounds = [[dim_lower, dim_high]
-                           for _ in range(self.dimension)]
+        self.dim_bounds = [[dim_lower, dim_high] for _ in range(self.dimension)]
         self.root = None
         self.clusters = []
 
@@ -250,8 +247,7 @@ class GridTree:
 
         # select a dimension to split which should be in a large range
         which_dim = random.randint(0, self.dimension - 1)
-        dim_range = self.dim_bounds[which_dim][1] - \
-            self.dim_bounds[which_dim][0]
+        dim_range = self.dim_bounds[which_dim][1] - self.dim_bounds[which_dim][0]
         for _ in range(3):
             dim = random.randint(0, self.dimension - 1)
             tem_range = self.dim_bounds[dim][1] - self.dim_bounds[dim][0]
@@ -291,10 +287,8 @@ class GridTree:
 
             l_centers = [grid.center for grid in l_edges]
             r_centers = [grid.center for grid in r_edges]
-            l_ball_tree = BallTree(
-                l_centers, leaf_size=200, metric="euclidean")
-            r_ball_tree = BallTree(
-                r_centers, leaf_size=200, metric="euclidean")
+            l_ball_tree = BallTree(l_centers, leaf_size=200, metric="euclidean")
+            r_ball_tree = BallTree(r_centers, leaf_size=200, metric="euclidean")
 
             # get extra-weights and edge-neighbors of edge-grids
             l_indexs = r_ball_tree.query_radius(l_centers, self.threshold)
@@ -330,20 +324,20 @@ class GridTree:
 
     def fit(self):
         """Cluster the grid tree"""
-        #start = timeit.default_timer()
+        start = timeit.default_timer()
         self.root = self.build_tree(0, self.grids, self.dim_bounds)
-        #print("build tree time: ", timeit.default_timer() - start)
+        print("build tree time: ", timeit.default_timer() - start)
         # 1. cluster the leaf nodes
-        #start = timeit.default_timer()
+        start = timeit.default_timer()
         self.cluster_leaves()
-        #print("cluster leaves time: ", timeit.default_timer() - start)
+        print("cluster leaves time: ", timeit.default_timer() - start)
 
         # 2. cluster the non-leaf nodes
-        #start = timeit.default_timer()
+        start = timeit.default_timer()
         for level in range(len(self.level_nodes) - 1, -1, -1):
             for node in self.level_nodes[level]:
                 self._merge_children(node)
-        #print("cluster non-leaves time: ", timeit.default_timer() - start)
+        print("cluster non-leaves time: ", timeit.default_timer() - start)
         self.clusters = self.root.clusters
 
     def cluster_leaves(self):

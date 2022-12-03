@@ -6,9 +6,14 @@ import matplotlib.pyplot as plt
 
 def gen_paras(a, b, acc):
     res = []
-    while a <= b:
-        res.append(a)
-        a += acc
+    if acc > 0:
+        while a <= b:
+            res.append(a)
+            a += acc
+    else:
+        while a >= b:
+            res.append(a)
+            a += acc
     return res
 
 
@@ -25,7 +30,7 @@ def read_data(path):
     with open(path) as fp:
         str_data = fp.readlines()
         for line in str_data:
-            tem = line.strip().split(',')
+            tem = line.strip().split(",")
             data.append(list(map(lambda x: float(x), tem)))
     return np.array(data)
 
@@ -37,21 +42,23 @@ def purity(y_true, y_pred):
     return np.sum(np.amax(contingency, axis=0)) / np.sum(contingency)
 
 
-def draw(data, labels):
+def draw(data, labels, name=None):
     scatter_x = data[:, 0]
     scatter_y = data[:, 1]
     _, ax = plt.subplots()
     for g in np.unique(labels):
         ix = np.where(labels == g)
-        if g == 0:
-            ax.scatter(scatter_x[ix], scatter_y[ix],
-                       label=g, s=5, color="black")
-        else:
-            ax.scatter(scatter_x[ix], scatter_y[ix], s=5, label=g)
-    ax.legend()
+        # if g == -1:
+        #    ax.scatter(scatter_x[ix], scatter_y[ix], label=g, s=5, color="gray")
+        # else:
+        ax.scatter(scatter_x[ix], scatter_y[ix], s=5, label=g)
+    # ax.legend()
+    if name:
+        ax.set_title(name)
     plt.xticks([])
     plt.yticks([])
     plt.show()
+
 
 # def draw(data, labels,names=None):
 #    if not isinstance(labels[0],list):

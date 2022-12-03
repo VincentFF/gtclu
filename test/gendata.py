@@ -1,6 +1,6 @@
 from sklearn.datasets import make_blobs
 
-name = "100k-30d-5c"
+name = "300k-30d-10c"
 forder = "/home/doors/Code/dataset/origin"
 
 file = forder + "/" + name
@@ -8,7 +8,7 @@ label = "/home/doors/Code/dataset/big/" + name + "-class"
 
 
 X, y = make_blobs(
-    n_samples=100000, centers=5, n_features=30, shuffle=True, random_state=0
+    n_samples=300000, centers=10, n_features=30, shuffle=True, random_state=0
 )
 
 with open(label, "w") as f:

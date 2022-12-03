@@ -1,8 +1,8 @@
-sf = "/home/doors/Code/dataset/origin/ConfLongDemo_JSI_164860.txt"
-df = "/home/doors/Code/dataset/middle/ConfLongDemo_JSI_164860"
-dc = "/home/doors/Code/dataset/middle/eeg-eye-state-class"
+sf = "/home/doors/Code/dataset/origin/300k-30d-10c"
+df = "/home/doors/Code/dataset/efficiency/300k-30d-10c"
+# dc = "/home/doors/Code/dataset/middle/eeg-eye-state-class"
 
-d = 3
+d = 30
 min_max = [[float("inf"), float("-inf")] for i in range(d)]
 
 sd = []
@@ -11,7 +11,7 @@ cd = []
 with open(sf) as fp:
     line = fp.readline().strip()
     while line:
-        data = list(map(float, line.split()))
+        data = list(map(float, line.split(",")))
         cd.append(data[-1])
         sd.append(data[:d])
         for i in range(d):

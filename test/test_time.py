@@ -1,30 +1,29 @@
-from gtclu.gtclu.gtclu_fast import GTCLU
+from gtclu.test.util import gen_paras, read_data
 import timeit
-import numpy as np
+from gtclu.gtclu.gtclu_kdtree_py import GTCLU
+import sys
+import math
 
-record = "/home/doors/Code/GTCLU/gtclu/test/time-record"
-
-dataset = "50k-20d-10c"
-d = 20
-e = 0.5
-m = 10
+sys.setrecursionlimit(50000)
 
 
-sf = "/home/doors/Code/dataset/big/" + dataset
+datasets = [
+    # "10k-10d-5c",
+    "Aggregation",
+]
 
-gtclu = GTCLU(e, m, d, algo="tree")
-fp = open(sf)
-start = timeit.default_timer()
-line = fp.readline().strip()
-while line:
-    p = np.array(list(map(lambda x: float(x), line.split(","))))
-    gtclu.learn_one(p)
-    line = fp.readline().strip()
-fp.close()
-print("start fit")
-gtclu.fit()
-print(len(gtclu.clusters))
-print(len(gtclu.clusters[0]))
-end = timeit.default_timer()
-
-print(end - start)
+E = gen_paras(0.02, 0.1, 0.001)
+M = gen_paras(5, 10, 1)
+for dataset in datasets:
+    sf = "/home/doors/Code/dataset/quality/" + dataset
+    data = read_data(sf)
+    d = len(data[0])
+    for e in E:
+        for m in M:
+            start = timeit.default_timer()
+            gtclu = GTCLU(e, m, d, algo="tree")
+            for p in data:
+                gtclu.learn_one(p)
+            gtclu.fit()
+            end = timeit.default_timer()
+            print(e, end - start)
