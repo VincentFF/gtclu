@@ -10,32 +10,33 @@ sys.setrecursionlimit(50000)
 
 
 datasets = [
-    "10k-10d-5c",
+    "10k-10d-10c-0.6",
     # "letter",
 ]
 
-E = gen_paras(1, 8, 1)
-M = gen_paras(0, 5, 1)
+E = gen_paras(2, 4, 1)
+#M = gen_paras(20, 20, 1)
+M = [5]
 for dataset in datasets:
     sf = "/home/doors/Code/dataset/efficiency/" + dataset
     cf = "/home/doors/Code/dataset/efficiency/" + dataset + "-class"
 
-    labels = read_labels(cf)
+    #labels = read_labels(cf)
     max_ari = -1
     max_metircs = ()
     max_paras = ()
     time_cost = 0
     data = read_data(sf)
-    for e in E:
         # width = e / math.sqrt(len(data[0]))
         # e = int(math.floor(1 / width))
-        for m in M:
+    for m in M:
+        for e in E:
             start = timeit.default_timer()
             op = clique(data, e, m, ccore=False)
             op.process()
             clus = op.get_clusters()
             end = timeit.default_timer()
-            print(e, end - start, m)
+            print(e,m ,end - start)
 
     #        prelabels = [-1] * len(data)
 

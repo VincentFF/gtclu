@@ -1,8 +1,8 @@
-sf = "/home/doors/Code/dataset/origin/300k-30d-10c"
-df = "/home/doors/Code/dataset/efficiency/300k-30d-10c"
+sf = "/home/doors/Code/dataset/origin/10k-10d-10c-0.6"
+df = "/home/doors/Code/dataset/efficiency/10k-10d-10c-0.6"
 # dc = "/home/doors/Code/dataset/middle/eeg-eye-state-class"
 
-d = 30
+d = 10
 min_max = [[float("inf"), float("-inf")] for i in range(d)]
 
 sd = []

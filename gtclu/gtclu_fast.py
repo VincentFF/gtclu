@@ -266,7 +266,7 @@ class GridTree:
             return node
 
         l_edges, r_edges = [], []
-        l_edges_weight, r_edges_weight = 0, 0
+        # l_edges_weight, r_edges_weight = 0, 0
         l_grids, r_grids = [], []
         edge = (dim_bounds[which_dim][0] + dim_bounds[which_dim][1]) // 2
         for grid in grids:
@@ -274,12 +274,12 @@ class GridTree:
                 l_grids.append(grid)
                 if grid.pos[which_dim] == edge:
                     l_edges.append(grid)
-                    l_edges_weight += grid.weight
+                    # l_edges_weight += grid.weight
             else:
                 r_grids.append(grid)
                 if grid.pos[which_dim] == edge + 1:
                     r_edges.append(grid)
-                    r_edges_weight += grid.weight
+                    # r_edges_weight += grid.weight
 
         l_neighbors = {}
         r_neighbors = {}
@@ -326,18 +326,18 @@ class GridTree:
         """Cluster the grid tree"""
         start = timeit.default_timer()
         self.root = self.build_tree(0, self.grids, self.dim_bounds)
-        print("build tree time: ", timeit.default_timer() - start)
+        # print("build tree time: ", timeit.default_timer() - start)
         # 1. cluster the leaf nodes
         start = timeit.default_timer()
         self.cluster_leaves()
-        print("cluster leaves time: ", timeit.default_timer() - start)
+        # print("cluster leaves time: ", timeit.default_timer() - start)
 
         # 2. cluster the non-leaf nodes
         start = timeit.default_timer()
         for level in range(len(self.level_nodes) - 1, -1, -1):
             for node in self.level_nodes[level]:
                 self._merge_children(node)
-        print("cluster non-leaves time: ", timeit.default_timer() - start)
+        # print("cluster non-leaves time: ", timeit.default_timer() - start)
         self.clusters = self.root.clusters
 
     def cluster_leaves(self):

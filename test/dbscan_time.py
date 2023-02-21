@@ -8,12 +8,12 @@ sys.setrecursionlimit(50000)
 
 
 datasets = [
-    "10k-10d-5c",
+    "10k-3d-10c-0.6",
     # "letter",
 ]
 
-E = gen_paras(0.2, 2, 0.2)
-M = gen_paras(5, 5, 1)
+E = gen_paras(0.02, 0.2, 0.02)
+M = gen_paras(50, 50, 1)
 for dataset in datasets:
     sf = "/home/doors/Code/dataset/efficiency/" + dataset
     data = read_data(sf)

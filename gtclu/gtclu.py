@@ -250,7 +250,6 @@ class GridTree:
                 dim_range = tem_range
 
         # reach to the leaf level, return leaf node
-        # reach to the leaf level, return leaf node
         if (
             which_level == self.limit_depth
             or len(grids) <= self.split_threshold
