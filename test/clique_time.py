@@ -1,29 +1,51 @@
-from gtclu.test.util import gen_paras, read_data
+from gtclu.test.util import gen_paras, read_data, read_labels
 import timeit
-from pyclustering.cluster.clique import clique
+from pyclustering.cluster.clique import clique, clique_visualizer
 import sys
-import math
+from sklearn.metrics import rand_score, adjusted_rand_score
+
 
 sys.setrecursionlimit(50000)
 
 
-datasets = [
-    "10k-10d-5c",
-    # "letter",
-]
+dataset = "100k-3d-10c-0.6"
+E = gen_paras(10, 50, 5)
+M = [0, 5, 50, 100]
+# for dataset in datasets:
+# para = [(2, 0, 1)]
+sf = "/home/doors/Code/dataset/efficiency/" + dataset
+cf = "/home/doors/Code/dataset/efficiency/" + dataset + "-class"
+data = read_data(sf)
+labels = read_labels(cf)
+# max_ri = 0
+# best_time = 0
+# for e in E:
+#    width = e / math.sqrt(len(data[0]))
+#    sp = int(math.floor(1 / width))
+#    for m in M:
+for sp in E:
+    for m in M:
+        # for sp, m, ari in para:
+        start = timeit.default_timer()
+        op = clique(data, sp, m, ccore=False)
+        op.process()
+        clus = op.get_clusters()
+        end = timeit.default_timer()
+        # show cells
+        # clique_visualizer.show_grid(op.get_cells(), data)
+        # clique_visualizer.show_clusters(data, clus, op.get_noise())
 
-E = gen_paras(2, 0.2, -0.2)
-M = gen_paras(5, 5, 1)
-for dataset in datasets:
-    sf = "/home/doors/Code/dataset/efficiency/" + dataset
-    data = read_data(sf)
-    for e in E:
-        width = e / math.sqrt(len(data[0]))
-        sp = int(math.floor(1 / width))
-        for m in M:
-            start = timeit.default_timer()
-            op = clique(data, sp, m, ccore=False)
-            op.process()
-            clus = op.get_clusters()
-            end = timeit.default_timer()
-            print(dataset, end - start, e, m)
+        prelabels = [-1] * len(data)
+        for i, v in enumerate(clus):
+            for j in v:
+                prelabels[j] = i + 1
+
+        # ri = rand_score(labels, prelabels)
+        ari = adjusted_rand_score(labels, prelabels)
+        print(sp, m, end - start, ari)
+
+    # print(ari, ri, end - start, sp, m)
+
+    # if ri > max_ri:
+    #    max_ri = ri
+    #    best_time = end - start
