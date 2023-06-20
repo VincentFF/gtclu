@@ -65,10 +65,11 @@ class GTCLU:
                     tem_pos = tuple([pos[i] + d[i] for i in range(self.d)])
                     if tem_pos in self.table:
                         tem_grid = self.table[tem_pos]
+                        dis = np.linalg.norm(center - tem_grid.center)
+                        if dis > self.epsilon:
+                            continue
                         near_weight += tem_grid.weight * min(
-                            0.5
-                            * self.epsilon
-                            / np.linalg.norm(center - tem_grid.center),
+                            0.5 * self.epsilon / dis,
                             1,
                         )
                         self.edges[pos].append(tem_pos)
@@ -94,7 +95,7 @@ class GTCLU:
 
             while que:
                 cur_pos = que.popleft()
-
+                cur_grid = self.table[cur_pos]
                 if cur_pos in self.edges:
                     for near_pos in self.edges[cur_pos]:
                         near_grid = self.table[near_pos]
@@ -109,7 +110,12 @@ class GTCLU:
                         if near_pos not in self.table:
                             continue
                         near_grid = self.table[near_pos]
-                        if near_grid.core and near_grid.cluster == -1:
+                        if (
+                            near_grid.core
+                            and near_grid.cluster == -1
+                            and np.linalg.norm(cur_grid.center - near_grid.center)
+                            <= self.epsilon
+                        ):
                             near_grid.cluster = self.flag
                             que.append(near_pos)
 
@@ -120,6 +126,7 @@ class GTCLU:
             max_core_weight = 0
             max_core_pos = None
             border_grid = self.table[pos]
+            cur_grid = self.table[pos]
             if pos in self.edges:
                 for near_pos in self.edges[pos]:
                     near_grid = self.table[near_pos]
@@ -132,7 +139,12 @@ class GTCLU:
                     if near_pos not in self.table:
                         continue
                     near_grid = self.table[near_pos]
-                    if near_grid.core and near_grid.weight > max_core_weight:
+                    if (
+                        near_grid.core
+                        and near_grid.weight > max_core_weight
+                        and np.linalg.norm(cur_grid.center - near_grid.center)
+                        <= self.epsilon
+                    ):
                         max_core_pos = near_pos
                         max_core_weight = near_grid.weight
 

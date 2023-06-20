@@ -324,20 +324,20 @@ class GridTree:
 
     def fit(self):
         """Cluster the grid tree"""
-        start = timeit.default_timer()
+        # start = timeit.default_timer()
         self.root = self.build_tree(0, self.grids, self.dim_bounds)
-        print("build tree time: ", timeit.default_timer() - start)
+        # print("build tree time: ", timeit.default_timer() - start)
         # 1. cluster the leaf nodes
-        start = timeit.default_timer()
+        # start = timeit.default_timer()
         self.cluster_leaves()
-        print("cluster leaves time: ", timeit.default_timer() - start)
+        # print("cluster leaves time: ", timeit.default_timer() - start)
 
         # 2. cluster the non-leaf nodes
-        start = timeit.default_timer()
+        # start = timeit.default_timer()
         for level in range(len(self.level_nodes) - 1, -1, -1):
             for node in self.level_nodes[level]:
                 self._merge_children(node)
-        print("cluster non-leaves time: ", timeit.default_timer() - start)
+        # print("cluster non-leaves time: ", timeit.default_timer() - start)
         self.clusters = self.root.clusters
 
     def cluster_leaves(self):
